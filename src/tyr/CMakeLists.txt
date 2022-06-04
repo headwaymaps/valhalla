@@ -29,5 +29,4 @@ valhalla_module(NAME tyr
     valhalla::thor
     valhalla::odin
     valhalla::proto
-    ${valhalla_protobuf_targets}
-    Boost::boost)
+    ${valhalla_protobuf_targets})

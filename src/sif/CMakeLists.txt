@@ -33,5 +33,4 @@ valhalla_module(NAME sif
   DEPENDS
     valhalla::baldr
     valhalla::proto
-    ${valhalla_protobuf_targets}
-    Boost::boost)
+    ${valhalla_protobuf_targets})

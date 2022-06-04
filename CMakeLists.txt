@@ -133,31 +133,6 @@ endif()
 find_package(Threads REQUIRED)
 find_package(ZLIB REQUIRED)
 
-# try to find an installed boost or install locally with conan
-set(boost_VERSION "1.71")
-find_package(Boost ${boost_VERSION} QUIET)
-if (NOT Boost_FOUND)
-  # bail if there's no conan installed
-  message(STATUS "No compatible boost version detected, using conan...")
-  find_program(conan_FOUND conan)
-  if (NOT conan_FOUND)
-    message(FATAL_ERROR "conan needs to be installed for boost, see https://docs.conan.io/en/latest/installation.html.")
-  endif()
-
-  # build dir needs to be added, that's where conan writes some info
-  list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
-  list(APPEND CMAKE_PREFIX_PATH ${CMAKE_BINARY_DIR})
-  include(${VALHALLA_SOURCE_DIR}/cmake/conan.cmake)
-
-  conan_cmake_autodetect(settings)
-  conan_cmake_install(PATH_OR_REFERENCE ${VALHALLA_SOURCE_DIR}/conanfile.txt
-                      REMOTE conancenter
-                      SETTINGS ${settings}
-                      OUTPUT_QUIET)
-endif()
-find_package(Boost ${boost_VERSION} REQUIRED)
-add_definitions(-DBOOST_NO_CXX11_SCOPED_ENUMS)
-
 if(NOT TARGET CURL::CURL)
   add_library(CURL::CURL INTERFACE IMPORTED)
   if(ENABLE_HTTP OR ENABLE_DATA_TOOLS)
@@ -177,56 +152,18 @@ else()
   message(STATUS "Using curl from the outside")
 endif()
 
-if(NOT Protobuf_FOUND)
-  find_package(Protobuf REQUIRED)
-endif()
+set(PROTOBUF_INCLUDE_DIR "/build/protobuf/src")
+set(PROTOBUF_LIBRARY "/build/protobuf")
+set(PROTOBUF_LIBRARY_RELEASE "")
+set(PROTOBUF_LIBRARY_DEBUG "")
 
-message(STATUS "Using pbf headers from ${PROTOBUF_INCLUDE_DIR}")
-message(STATUS "Using pbf libs from ${PROTOBUF_LIBRARY}")
-message(STATUS "Using pbf release libs from ${PROTOBUF_LIBRARY_RELEASE}")
-message(STATUS "Using pbf debug libs from ${PROTOBUF_LIBRARY_DEBUG}")
-if(TARGET protobuf::libprotobuf-lite)
-  message(STATUS "Using pbf-lite")
-endif()
-
-# TODO: remove after switching to CMake >= 3.9
-if(CMAKE_VERSION VERSION_LESS 3.9)
-  if(NOT TARGET protobuf::libprotobuf-lite)
-    add_library(protobuf::libprotobuf-lite UNKNOWN IMPORTED)
-    set_target_properties(protobuf::libprotobuf-lite PROPERTIES
-      FOLDER "Dependencies"
-      INTERFACE_INCLUDE_DIRECTORIES "${PROTOBUF_INCLUDE_DIR}")
-
-    if(EXISTS "${PROTOBUF_LIBRARY}")
-      set_target_properties(protobuf::libprotobuf-lite PROPERTIES
-        IMPORTED_LOCATION "${PROTOBUF_LIBRARY}")
-    endif()
-    if(EXISTS "${PROTOBUF_LIBRARY_RELEASE}")
-      set_property(TARGET protobuf::libprotobuf-lite APPEND PROPERTY
-        IMPORTED_CONFIGURATIONS RELEASE)
-      set_target_properties(protobuf::libprotobuf-lite PROPERTIES
-        IMPORTED_LOCATION_RELEASE "${PROTOBUF_LIBRARY_RELEASE}")
-    endif()
-    if(EXISTS "${PROTOBUF_LIBRARY_DEBUG}")
-      set_property(TARGET protobuf::libprotobuf-lite APPEND PROPERTY
-        IMPORTED_CONFIGURATIONS DEBUG)
-      set_target_properties(protobuf::libprotobuf-lite PROPERTIES
-        IMPORTED_LOCATION_DEBUG "${PROTOBUF_LIBRARY_DEBUG}")
-    endif()
-  endif()
-endif()
-
-# Allow linking against full or lite version of Protobuf library
-# TODO: After switching to CMake 3.12+, replace with
-#       $<TARGET_EXISTS:protobuf::libprotobuf
-#       $<TARGET_EXISTS:protobuf::libprotobuf-lite
-if(TARGET protobuf::libprotobuf-lite)
-  set(valhalla_protobuf_targets protobuf::libprotobuf-lite)
-elseif(TARGET protobuf::libprotobuf)
-  set(valhalla_protobuf_targets protobuf::libprotobuf)
-else()
-  message(FATAL_ERROR "Required target protobuf::libprotobuf-lite or protobuf::libprotobuf is not defined")
-endif()
+add_compile_options ( -I/build/protobuf/src )
+add_compile_options ( -I/build/zlib )
+add_compile_options ( -I/build )
+add_compile_options ( -s USE_BOOST_HEADERS=1 )
+add_link_options ( -s USE_BOOST_HEADERS=1 )
+add_link_options ( -lz )
+add_link_options ( -lprotobuf )
 
 add_library(libprime_server INTERFACE IMPORTED)
 if(ENABLE_SERVICES)

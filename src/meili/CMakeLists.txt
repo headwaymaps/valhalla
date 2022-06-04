@@ -26,5 +26,4 @@ valhalla_module(NAME meili
       ${CMAKE_BINARY_DIR}
   DEPENDS
     valhalla::sif
-    ${valhalla_protobuf_targets}
-    Boost::boost)
+    ${valhalla_protobuf_targets})
