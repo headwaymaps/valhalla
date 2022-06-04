@@ -58,12 +58,17 @@ RUN make -j4
 
 FROM emscripten/emsdk:3.1.4 as valhalla_builder
 
+RUN apt-get update -y
+RUN apt-get install -y git file
+
 WORKDIR /build
 
 COPY --from=zlib_builder /build/zlib-1.2.12 /build/zlib/
 COPY --from=protoc_builder /build/protobuf /build/protobuf/
 
-COPY valhalla /build/valhalla
+RUN mkdir /build/valhalla
+
+COPY . /build/valhalla/
 
 WORKDIR /build/valhalla/proto
 
@@ -76,8 +81,7 @@ RUN rm -rf /build/protobuf
 
 COPY --from=protobuf_builder /build/protobuf /build/protobuf/
 
-ENV LIBRARY_PATH=$LIBRARY_PATH:/build/protobuf:build/protobuf/src:/build/zlib
-ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/build/protobuf:build/protobuf/src:/build/zlib
+ENV LIBRARY_PATH=$LIBRARY_PATH:build/protobuf/src/.libs:/build/zlib
 
 WORKDIR /build/valhalla/build
 
@@ -89,10 +93,6 @@ RUN emcmake cmake .. \
   -DENABLE_BENCHMARKS=off \
   -DENABLE_HTTP=OFF \
   -DZLIB_LIBRARY=/build/zlib \
-  -DZLIB_INCLUDE_DIR=/build/zlib/include \
-  -DBoost_NO_SYSTEM_PATHS=ON \
-  -DBOOSTROOT=/build/boost_1_71_0/boost \
-  -DProtobuf_DIR=/build/protobuf \
-  -DProtobuf_ROOT=/build/protobuf
+  -DZLIB_INCLUDE_DIR=/build/zlib/include
 
 RUN emmake make VERBOSE=1 -j8
