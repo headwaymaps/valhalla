@@ -83,7 +83,7 @@ public:
   std::ostream& operator()(const std::string& value) const {
     ostream_ << '"';
     // TODO: this may need to get more complicated
-    for (const auto& c : value) {
+    for (const unsigned char& c : value) {
       switch (c) {
         case '\\':
           ostream_ << "\\\\";
@@ -110,7 +110,7 @@ public:
           ostream_ << "\\t";
           break;
         default:
-          if (c >= 0 && c < 32) {
+          if (c < 32) {
             // format changes for json hex
             ostream_.setf(std::ios::hex, std::ios::basefield);
             ostream_.setf(std::ios::uppercase);

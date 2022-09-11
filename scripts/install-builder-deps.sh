@@ -1,18 +1,11 @@
 #!/usr/bin/env bash
-# Script for shared dependencies
+# Script for dependencies shared between the docker builder images.
 
 set -x -o errexit -o pipefail -o nounset
 
-# Adds the primeserver ppa
-apt-get update --assume-yes
-apt-get install --assume-yes software-properties-common
-add-apt-repository ppa:valhalla-core/valhalla
-
-readonly primeserver_version=0.7.0
-
 # Now, go through and install the build dependencies
 apt-get update --assume-yes
-env DEBIAN_FRONTEND=noninteractive apt-get install --yes --quiet \
+env DEBIAN_FRONTEND=noninteractive apt-get install --yes \
     autoconf \
     automake \
     ccache \
@@ -27,17 +20,17 @@ env DEBIAN_FRONTEND=noninteractive apt-get install --yes --quiet \
     jq \
     lcov \
     libcurl4-openssl-dev \
+    libczmq-dev \
     libgeos++-dev \
     libgeos-dev \
     libluajit-5.1-dev \
     liblz4-dev \
-    libprime-server${primeserver_version} \
-    libprime-server${primeserver_version}-dev \
     libprotobuf-dev \
     libspatialite-dev \
     libsqlite3-dev \
     libsqlite3-mod-spatialite \
     libtool \
+    libzmq3-dev \
     lld \
     locales \
     luajit \
@@ -45,7 +38,6 @@ env DEBIAN_FRONTEND=noninteractive apt-get install --yes --quiet \
     osmium-tool \
     parallel \
     pkg-config \
-    prime-server${primeserver_version}-bin \
     protobuf-compiler \
     python3-all-dev \
     python3-shapely \
@@ -56,4 +48,4 @@ env DEBIAN_FRONTEND=noninteractive apt-get install --yes --quiet \
   && rm -rf /var/lib/apt/lists/*
 
 # for boost
-python3 -m pip install --upgrade conan requests
+pip install conan

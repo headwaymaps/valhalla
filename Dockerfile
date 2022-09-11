@@ -1,32 +1,53 @@
-####################################################################
-FROM ubuntu:20.04 as builder 
-MAINTAINER Kevin Kreiser <kevinkreiser@gmail.com>
+FROM ubuntu:20.04 as builder_base
 
-ARG CONCURRENCY
+COPY scripts/install-builder-deps.sh .
+RUN bash ./install-builder-deps.sh
+
+FROM builder_base as prime_server_builder
+
+COPY scripts/install-primeserver-deps.sh .
+RUN bash ./install-primeserver-deps.sh
+
+WORKDIR /prime_server/prime_server
+RUN ./autogen.sh && ./configure LDFLAGS="-fPIC" CPPFLAGS="-fPIC" --prefix /prime_server && make -j$(nproc) V=1 && make install
+
+FROM builder_base as builder
 
 # set paths
 ENV PATH /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH
-ENV LD_LIBRARY_PATH /usr/local/lib:/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/lib32:/usr/lib32
-
-# install deps
-WORKDIR /usr/local/src/valhalla
-COPY ./scripts/install-linux-deps.sh /usr/local/src/valhalla/scripts/install-linux-deps.sh
-RUN bash /usr/local/src/valhalla/scripts/install-linux-deps.sh
+ENV LD_LIBRARY_PATH /usr/local/lib:/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/usr/lib/aarch64-linux-gnu:/lib32:/usr/lib32
+ENV LIBRARY_PATH /usr/local/lib:/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/usr/lib/aarch64-linux-gnu:/lib32:/usr/lib32
 
 # get the code into the right place and prepare to build it
-ADD . /usr/local/src/valhalla
-RUN ls
+WORKDIR /usr/local/src/valhalla
+COPY .git /usr/local/src/valhalla/.git
 RUN git submodule sync && git submodule update --init --recursive
-RUN rm -rf build && mkdir build
+RUN mkdir build
 
-# upgrade Conan again, to avoid using an outdated version:
-# https://github.com/valhalla/valhalla/issues/3685#issuecomment-1198604174
-RUN pip install --upgrade conan
+# copy prime_server artifacts
+COPY --from=prime_server_builder /usr/local /usr/local
+COPY --from=prime_server_builder /prime_server/bin/prime_* /usr/bin/
+COPY --from=prime_server_builder /prime_server/lib/libprime* /usr/lib/*-linux-gnu/
+COPY --from=prime_server_builder /prime_server/include/prime_server/* /usr/include/prime_server/
 
 # configure the build with symbols turned on so that crashes can be triaged
 WORKDIR /usr/local/src/valhalla/build
-RUN cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER=gcc
-RUN make all -j${CONCURRENCY:-$(nproc)}
+
+COPY --from=prime_server_builder /prime_server/lib/libprime* /usr/local/src/valhalla/build/prime_server_lib/
+
+COPY . /usr/local/src/valhalla/
+
+# RUN ls -l /usr/local/src/valhalla/build/prime_server_lib/ && ls -l /usr/local/src/valhalla/ && git status && exit 1
+
+RUN cmake .. -LAH -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DENABLE_PRIME_SERVER_VERSION_CHECK=NO \
+    -DPRIME_SERVER_INCLUDE_DIR="/usr/include/" \
+    -DPRIME_SERVER_LIB="/usr/local/src/valhalla/build/prime_server_lib/libprime_server.a" \
+    -DCZMQ_LIB="/usr/local/libczmq.a" \
+    -DENABLE_WERROR=OFF \
+    -DCMAKE_C_COMPILER=gcc
+RUN make all -j$(nproc) VERBOSE=1
+RUN make test
 RUN make install
 
 # we wont leave the source around but we'll drop the commit hash we'll also keep the locales
@@ -38,19 +59,20 @@ RUN rm -rf valhalla
 # the binaries are huge with all the symbols so we strip them but keep the debug there if we need it
 WORKDIR /usr/local/bin
 RUN for f in valhalla_*; do objcopy --only-keep-debug $f $f.debug; done
-RUN tar -cvf valhalla.debug.tar valhalla_*.debug && gzip -9 valhalla.debug.tar
+RUN tar -cvf valhalla.debug.tar valhalla_*.debug && gzip -1 valhalla.debug.tar
 RUN rm -f valhalla_*.debug
 RUN strip --strip-debug --strip-unneeded valhalla_* || true
 RUN strip /usr/local/lib/libvalhalla.a
-RUN strip /usr/lib/python3/dist-packages/valhalla/python_valhalla.cpython-38-x86_64-linux-gnu.so
+RUN strip /usr/lib/python3/dist-packages/valhalla/python_valhalla.cpython-38-*-linux-gnu.so
 
 ####################################################################
 # copy the important stuff from the build stage to the runner image
 FROM ubuntu:20.04 as runner
-MAINTAINER Kevin Kreiser <kevinkreiser@gmail.com>
+
+COPY --from=prime_server_builder /usr/local /usr/local
 COPY --from=builder /usr/local /usr/local
-COPY --from=builder /usr/bin/prime_* /usr/bin/
-COPY --from=builder /usr/lib/x86_64-linux-gnu/libprime* /usr/lib/x86_64-linux-gnu/
+COPY --from=prime_server_builder /prime_server/bin/prime_* /usr/bin/
+COPY --from=prime_server_builder /prime_server/lib/libprime* /usr/lib/*-linux-gnu/
 COPY --from=builder /usr/lib/python3/dist-packages/valhalla/* /usr/lib/python3/dist-packages/valhalla/
 
 # we need to add back some runtime dependencies for binaries and scripts
