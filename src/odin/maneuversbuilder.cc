@@ -564,7 +564,7 @@ void ManeuversBuilder::Combine(std::list<Maneuver>& maneuvers) {
         maneuvers_have_been_combined = true;
       }
       // Combine obvious maneuver
-      else if (IsNextManeuverObvious(maneuvers, curr_man, next_man)) {
+      else if (IsNextManeuverObvious(maneuvers, curr_man, next_man) && next_man->length() < 3) {
         // If current maneuver does not have street names then use the next maneuver street names
         if (!curr_man->HasStreetNames() && next_man->HasStreetNames()) {
           curr_man->set_street_names(next_man->street_names().clone());
