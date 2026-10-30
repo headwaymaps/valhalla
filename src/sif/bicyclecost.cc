@@ -769,6 +769,9 @@ Cost BicycleCost::EdgeCost(const baldr::DirectedEdge* edge,
   // Represents how stressful a roadway is without looking at grade or cycle accommodations
   float roadway_stress = 1.0f;
 
+  // The stress of the road's class, which riding on a bicycle network doesn't relieve
+  float road_class_stress = 0.0f;
+
   // Represents the amount of accommodation that is being made for bicycling
   float accommodation_factor = 1.0f;
 
@@ -800,13 +803,14 @@ Cost BicycleCost::EdgeCost(const baldr::DirectedEdge* edge,
     }
 
     // Add in penalization for road classification (higher class roads are more stress)
-    roadway_stress += road_class_stress_[static_cast<uint32_t>(edge->classification())];
+    road_class_stress = road_class_stress_[static_cast<uint32_t>(edge->classification())];
 
     // Multiply by speed so that higher classified roads are more severely punished for being fast.
     // Use the speed assigned to the directed edge. Even if we had traffic information we shouldn't
     // use it here. High speed penalized edges so we want the "default" speed rather than a traffic
     // influenced speed anyway.
     roadway_stress *= speedpenalty_[edge->speed()];
+    road_class_stress *= speedpenalty_[edge->speed()];
   }
 
   // We want to try and avoid roads that specify to use a cycling path to the side
@@ -814,15 +818,15 @@ Cost BicycleCost::EdgeCost(const baldr::DirectedEdge* edge,
     accommodation_factor += sidepath_factor_;
   }
 
-  // Favor bicycle networks
+  // Favor bicycle networks, though a busy road on one is still a busy road
   if (edge->bike_network()) {
-    accommodation_factor *= bicycle_network_factor_;
+    roadway_stress *= bicycle_network_factor_;
   }
 
   // Create an edge factor based on total stress (sum of accommodation factor and roadway
   // stress) and the weighted grade penalty for the edge.
-  float factor =
-      1.0f + grade_penalty[edge->weighted_grade()] + (accommodation_factor * roadway_stress);
+  float factor = 1.0f + grade_penalty[edge->weighted_grade()] +
+                 (accommodation_factor * (roadway_stress + road_class_stress));
 
   // If surface is worse than the minimum we add a surface factor
   if (edge->surface() >= minimal_surface_penalized_) {
