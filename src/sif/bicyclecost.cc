@@ -413,6 +413,17 @@ public:
     return destination_only_penalty_ * (edge->destonly() && !pred_destonly && bike_infrastructure);
   }
 
+  /**
+   * The maneuver penalty that base_transition_cost charged for a name change onto or off a
+   * roundabout. Riding through a traffic circle is one movement, not a turn onto an unnamed road
+   * and another back.
+   */
+  float RoundaboutManeuverWaiver(const baldr::DirectedEdge* edge,
+                                 const uint32_t idx,
+                                 const bool roundabout) const {
+    return maneuver_penalty_ * (roundabout && !edge->link() && !edge->name_consistency(idx));
+  }
+
   // Hidden in source file so we don't need it to be protected
   // We expose it within the source file for testing purposes
 
@@ -761,6 +772,8 @@ Cost BicycleCost::TransitionCost(const baldr::DirectedEdge* edge,
   uint32_t idx = pred.opp_local_idx();
   Cost c = base_transition_cost(node, edge, &pred, idx);
   c.cost -= DestinationOnlyWaiver(edge, pred.destonly());
+  const bool roundabout = edge->roundabout() || pred.roundabout();
+  c.cost -= RoundaboutManeuverWaiver(edge, idx, roundabout);
 
   // Reduce penalty to make this turn if the road we are turning on has some kind of bicycle
   // accommodation
@@ -781,7 +794,7 @@ Cost BicycleCost::TransitionCost(const baldr::DirectedEdge* edge,
   float seconds = 0.0f;
   float turn_stress = 1.0f;
   const auto stopimpact = edge->stopimpact(idx);
-  if (stopimpact > 0) {
+  if (stopimpact > 0 && !roundabout) {
     // Increase turn stress depending on the kind of turn that has to be made.
     uint32_t turn_type = static_cast<uint32_t>(edge->turntype(idx));
     float turn_penalty = (node->drive_on_right()) ? kRightSideTurnPenalties[turn_type]
@@ -842,6 +855,8 @@ Cost BicycleCost::TransitionCostReverse(const uint32_t idx,
   // destination only, alley, maneuver penalty
   Cost c = base_transition_cost(node, edge, pred, idx);
   c.cost -= DestinationOnlyWaiver(edge, pred->destonly());
+  const bool roundabout = edge->roundabout() || pred->roundabout();
+  c.cost -= RoundaboutManeuverWaiver(edge, idx, roundabout);
 
   // Reduce penalty to make this turn if the road we are turning on has some kind of bicycle
   // accommodation
@@ -862,7 +877,7 @@ Cost BicycleCost::TransitionCostReverse(const uint32_t idx,
   float seconds = 0.0f;
   float turn_stress = 1.0f;
   const auto stopimpact = edge->stopimpact(idx);
-  if (stopimpact > 0) {
+  if (stopimpact > 0 && !roundabout) {
     // Increase turn stress depending on the kind of turn that has to be made.
     uint32_t turn_type = static_cast<uint32_t>(edge->turntype(idx));
     float turn_penalty = (node->drive_on_right()) ? kRightSideTurnPenalties[turn_type]
