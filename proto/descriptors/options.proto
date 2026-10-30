@@ -372,6 +372,10 @@ message Costing {
     oneof has_bicycle_network_factor {
       float bicycle_network_factor = 100;
     }
+
+    oneof has_walk_bike_factor {
+      float walk_bike_factor = 102;
+    }
   }
 
   oneof has_options {

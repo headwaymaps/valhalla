@@ -484,7 +484,7 @@ std::vector<std::vector<PathInfo>> UnidirectionalAStar<expansion_direction, FORW
   mode_ = mode;
   costing_ = mode_costing[static_cast<uint32_t>(mode_)];
   travel_type_ = costing_->travel_type();
-  access_mode_ = costing_->access_mode();
+  access_mode_ = costing_->expansion_access_mode();
 
   if (!FORWARD) {
     // date_time must be set on the destination. Log an error but allow routes for now.
