@@ -362,6 +362,16 @@ message Costing {
     oneof has_low_class_factor {
       float low_class_factor = 97;
     }
+
+    oneof has_road_class_factor {
+      float road_class_factor = 98;
+    }
+
+    repeated float road_class_factors = 99;
+
+    oneof has_bicycle_network_factor {
+      float bicycle_network_factor = 100;
+    }
   }
 
   oneof has_options {
