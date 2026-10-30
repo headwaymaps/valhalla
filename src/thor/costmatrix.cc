@@ -219,7 +219,7 @@ bool CostMatrix::SourceToTarget(Api& request,
   // Set the mode and costing
   mode_ = mode;
   costing_ = mode_costing[static_cast<uint32_t>(mode_)];
-  access_mode_ = costing_->access_mode();
+  access_mode_ = costing_->expansion_access_mode();
 
   auto& source_location_list = *request.mutable_options()->mutable_sources();
   auto& target_location_list = *request.mutable_options()->mutable_targets();

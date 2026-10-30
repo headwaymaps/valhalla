@@ -206,6 +206,8 @@ constexpr uint32_t kSpeedPenaltyThreshold = 40; // 40 KPH ~ 25 MPH
 
 // How much to favor bicycle networks.
 constexpr ranged_default_t<float> kBicycleNetworkFactorRange{0.0f, 0.95f, 1.0f};
+// Cost factor for walking a bike, on top of the slower walking speed.
+constexpr ranged_default_t<float> kWalkBikeFactorRange{1.0f, 1.5f, 100.0f};
 
 // Valid ranges and defaults
 constexpr ranged_default_t<float> kUseRoadRange{0.0f, kDefaultUseRoad, 1.0f};
@@ -471,6 +473,25 @@ public:
     return neighborhood ? kNeighborhoodRoundaboutFactor : 1.0f;
   }
 
+  /**
+   * Whether the bike must be walked along the edge: pedestrians may go this way but bikes may not,
+   * e.g. against a path's bicycle one-way or on a bicycle=no footway, and cars may use neither
+   * direction.
+   */
+  bool WalkBike(const baldr::DirectedEdge* edge) const {
+    const uint32_t access = edge->forwardaccess() | edge->reverseaccess();
+    return !(edge->forwardaccess() & kBicycleAccess) && (edge->forwardaccess() & kPedestrianAccess) &&
+           !(access & kAutoAccess) && edge->use() != Use::kConstruction;
+  }
+
+  uint32_t expansion_access_mode() const override {
+    return access_mode() | kPedestrianAccess;
+  }
+
+  bool IsAccessible(const baldr::DirectedEdge* edge) const override {
+    return DynamicCost::IsAccessible(edge) || WalkBike(edge);
+  }
+
   // Hidden in source file so we don't need it to be protected
   // We expose it within the source file for testing purposes
 
@@ -479,6 +500,7 @@ public:
   float road_factor_;            // Road factor based on use_roads_
   float road_class_factor_;      // Scales the stress of tertiary and higher road classes
   float bicycle_network_factor_; // Scales the stress of edges on a bicycle network
+  float walk_bike_factor_;       // Scales the cost of walking the bike
   float road_class_stress_[kNumRoadClassFactors]; // Stress added by each road class
   float sidepath_factor_;                         // Factor to use when use_sidepath is set on an edge
   float livingstreet_factor_;                     // Factor to use for living streets
@@ -522,7 +544,8 @@ protected:
   bool Allowed(const baldr::DirectedEdge* edge,
                const graph_tile_ptr& tile,
                uint16_t disallow_mask = kDisallowNone) const override {
-    return DynamicCost::Allowed(edge, tile, disallow_mask) && !edge->bss_connection() &&
+    return (DynamicCost::Allowed(edge, tile, disallow_mask) || WalkBike(edge)) &&
+           !edge->bss_connection() &&
            (avoid_bad_surfaces_ != 1.0f || edge->surface() <= worst_allowed_surface_);
   }
 };
@@ -583,6 +606,7 @@ BicycleCost::BicycleCost(const Costing& costing)
   road_factor_ = (use_roads_ >= 0.5f) ? 1.5f - use_roads_ : 2.0f - use_roads_ * 2.0f;
   road_class_factor_ = costing_options.road_class_factor();
   bicycle_network_factor_ = costing_options.bicycle_network_factor();
+  walk_bike_factor_ = costing_options.walk_bike_factor();
   const auto& class_factors = costing_options.road_class_factors();
   for (uint32_t rc = 0; rc < kNumRoadClassFactors; rc++) {
     const bool major = rc <= static_cast<uint32_t>(RoadClass::kTertiary);
@@ -813,14 +837,15 @@ Cost BicycleCost::EdgeCost(const baldr::DirectedEdge* edge,
   // walking speed. Otherwise, set speed based on surface factor and grade. Lower bike speed
   // for rougher surfaces (amount depends on on the bicycle type). Weighted grade (relative
   // measure of elevation change along the edge) modulates speed based on elevation changes.
+  const bool walk = edge->dismount() || WalkBike(edge);
   uint32_t bike_speed =
-      edge->dismount() ? kDismountSpeed
-                       : static_cast<uint32_t>(
-                             (speed_ * surface_speed_factor_[static_cast<uint32_t>(edge->surface())] *
-                              kGradeBasedSpeedFactor[edge->weighted_grade()]) +
-                             0.5f);
+      walk ? kDismountSpeed
+           : static_cast<uint32_t>(
+                 (speed_ * surface_speed_factor_[static_cast<uint32_t>(edge->surface())] *
+                  kGradeBasedSpeedFactor[edge->weighted_grade()]) +
+                 0.5f);
 
-  factor *= EdgeFactor(edgeid);
+  factor *= EdgeFactor(edgeid) * (WalkBike(edge) ? walk_bike_factor_ : 1.0f);
 
   // Compute elapsed time based on speed. Modulate cost with weighting factors.
   float sec = (edge->length() * kSpeedFactor[bike_speed]);
@@ -1000,6 +1025,8 @@ void ParseBicycleCostOptions(const rapidjson::Document& doc,
   ParseBaseCostOptions(json, c, kBaseCostOptsConfig, warnings);
   JSON_PBF_RANGED_DEFAULT(co, kUseRoadRange, json, "/use_roads", use_roads, warnings);
   JSON_PBF_RANGED_DEFAULT(co, kRoadClassFactorRange, json, "/road_class_factor", road_class_factor,
+                          warnings);
+  JSON_PBF_RANGED_DEFAULT(co, kWalkBikeFactorRange, json, "/walk_bike_factor", walk_bike_factor,
                           warnings);
   JSON_PBF_RANGED_DEFAULT(co, kBicycleNetworkFactorRange, json, "/bicycle_network_factor",
                           bicycle_network_factor, warnings);

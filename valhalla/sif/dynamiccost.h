@@ -324,6 +324,15 @@ public:
   }
 
   /**
+   * The access modes for which path algorithms consider an edge before asking the costing
+   * whether it is allowed. Wider than access_mode() when the costing allows edges this mode
+   * lacks access to.
+   */
+  virtual uint32_t expansion_access_mode() const {
+    return access_mode();
+  }
+
+  /**
    * Checks if access is allowed for the provided directed edge.
    * This is generally based on mode of travel and the access modes
    * allowed on the edge. However, it can be extended to exclude access

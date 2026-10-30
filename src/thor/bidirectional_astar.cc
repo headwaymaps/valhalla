@@ -509,7 +509,7 @@ BidirectionalAStar::GetBestPath(valhalla::Location& origin,
   mode_ = mode;
   costing_ = mode_costing[static_cast<uint32_t>(mode_)];
   travel_type_ = costing_->travel_type();
-  access_mode_ = costing_->access_mode();
+  access_mode_ = costing_->expansion_access_mode();
 
   desired_paths_count_ = 1;
   if (options.has_alternates_case() && options.alternates())
