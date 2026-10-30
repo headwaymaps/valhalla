@@ -399,6 +399,25 @@ public:
     return {kDefaultBssCost, kDefaultBssPenalty};
   };
 
+  /**
+   * The destination only penalty that base_transition_cost charged for entering this edge, if
+   * the edge is bike infrastructure. Riders belong on bike networks and cycle lanes even where
+   * motor vehicles may only enter to reach a destination (e.g. motor_vehicle=destination). The
+   * destination only flag is shared by all modes, so access=private ways stay penalized unless
+   * they carry bike infrastructure too.
+   */
+  template <typename predecessor_t>
+  float DestinationOnlyWaiver(const baldr::DirectedEdge* edge,
+                              const predecessor_t* pred,
+                              const bool edge_destonly,
+                              const bool pred_destonly) const {
+    const bool bike_infrastructure = edge->bike_network() || edge->cyclelane() != CycleLane::kNone ||
+                                     edge->use() == Use::kCycleway;
+    const bool is_destonly = edge_destonly || edge->destonly();
+    return destination_only_penalty_ *
+           (is_destonly && !(pred_destonly || pred->destonly()) && bike_infrastructure);
+  }
+
   // Hidden in source file so we don't need it to be protected
   // We expose it within the source file for testing purposes
 
@@ -753,6 +772,7 @@ Cost BicycleCost::TransitionCost(const baldr::DirectedEdge* edge,
   // destination only, alley, maneuver penalty
   uint32_t idx = pred.opp_local_idx();
   Cost c = base_transition_cost(node, edge, &pred, idx, edge_destonly);
+  c.cost -= DestinationOnlyWaiver(edge, &pred, edge_destonly, false);
 
   // Reduce penalty to make this turn if the road we are turning on has some kind of bicycle
   // accommodation
@@ -834,6 +854,7 @@ Cost BicycleCost::TransitionCostReverse(const uint32_t idx,
   // Get the transition cost for country crossing, ferry, gate, toll booth,
   // destination only, alley, maneuver penalty
   Cost c = base_transition_cost(node, edge, pred, idx, pred_label.destonly(), opp_edge_destonly);
+  c.cost -= DestinationOnlyWaiver(edge, pred, pred_label.destonly(), opp_edge_destonly);
 
   // Reduce penalty to make this turn if the road we are turning on has some kind of bicycle
   // accommodation
