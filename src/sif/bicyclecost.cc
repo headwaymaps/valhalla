@@ -67,6 +67,12 @@ constexpr float kTPUnfavorable = 1.75f;
 constexpr float kTPUnfavorableSharp = 2.25f;
 constexpr float kTPReverse = 4.0f;
 
+// Crash research points to lanes and speed as what makes roundabouts worse for cyclists, with road
+// class standing in for speed since it's more consistently tagged. The direction follows Poudel &
+// Singleton (2021), but the size of each factor is a judgment call.
+constexpr float kBusyRoundaboutFactor = 1.5f;
+constexpr float kNeighborhoodRoundaboutFactor = 0.9f;
+
 constexpr float kRightSideTurnPenalties[] = {kTPStraight,    kTPFavorableSlight,
                                              kTPFavorable,   kTPFavorableSharp,
                                              kTPReverse,     kTPUnfavorableSharp,
@@ -421,6 +427,50 @@ public:
            (is_destonly && !(pred_destonly || pred->destonly()) && bike_infrastructure);
   }
 
+  /**
+   * The maneuver penalty that base_transition_cost charged for a name change onto or off a
+   * roundabout. Riding through a traffic circle is one movement, not a turn onto an unnamed road
+   * and another back.
+   */
+  float RoundaboutManeuverWaiver(const baldr::DirectedEdge* edge,
+                                 const uint32_t idx,
+                                 const bool roundabout) const {
+    return maneuver_penalty_ * (roundabout && !edge->link() && !edge->name_consistency(idx));
+  }
+
+  /**
+   * The turn a rider makes onto the edge. Every turn into, around, or out of a roundabout follows
+   * the flow of traffic, so it costs a turn to the curb side whatever angle the edges meet at.
+   */
+  uint32_t RidersTurnType(const baldr::DirectedEdge* edge,
+                          const uint32_t idx,
+                          const bool roundabout,
+                          const bool drive_on_right) const {
+    const auto turn_type = static_cast<uint32_t>(edge->turntype(idx));
+    const auto reverse = static_cast<uint32_t>(Turn::Type::kReverse);
+    const bool across_traffic =
+        drive_on_right ? turn_type > reverse : turn_type > 0 && turn_type < reverse;
+    // Mirrors the turn to the other side, e.g. kLeft to kRight.
+    return roundabout && across_traffic ? 2 * reverse - turn_type : turn_type;
+  }
+
+  /**
+   * Busy roundabouts, with more than one lane or on a major road, are riskier for cyclists, while
+   * single lane neighborhood traffic circles calm traffic.
+   */
+  float RoundaboutFactor(const baldr::DirectedEdge* edge) const {
+    if (!edge->roundabout()) {
+      return 1.0f;
+    }
+    if (edge->lanecount() > 1 || edge->classification() <= baldr::RoadClass::kSecondary) {
+      return kBusyRoundaboutFactor;
+    }
+    const bool neighborhood = edge->classification() == baldr::RoadClass::kResidential ||
+                              edge->classification() == baldr::RoadClass::kUnclassified ||
+                              edge->use() == Use::kLivingStreet;
+    return neighborhood ? kNeighborhoodRoundaboutFactor : 1.0f;
+  }
+
   // Hidden in source file so we don't need it to be protected
   // We expose it within the source file for testing purposes
 
@@ -757,6 +807,8 @@ Cost BicycleCost::EdgeCost(const baldr::DirectedEdge* edge,
                                               static_cast<uint32_t>(minimal_surface_penalized_)];
   }
 
+  factor *= RoundaboutFactor(edge);
+
   // Compute bicycle speed. If you have to dismount on the edge then set speed to an average
   // walking speed. Otherwise, set speed based on surface factor and grade. Lower bike speed
   // for rougher surfaces (amount depends on on the bicycle type). Weighted grade (relative
@@ -787,6 +839,8 @@ Cost BicycleCost::TransitionCost(const baldr::DirectedEdge* edge,
   uint32_t idx = pred.opp_local_idx();
   Cost c = base_transition_cost(node, edge, &pred, idx, edge_destonly);
   c.cost -= DestinationOnlyWaiver(edge, &pred, edge_destonly, false);
+  const bool roundabout = edge->roundabout() || pred.roundabout();
+  c.cost -= RoundaboutManeuverWaiver(edge, idx, roundabout);
 
   // Reduce penalty to make this turn if the road we are turning on has some kind of bicycle
   // accommodation
@@ -809,7 +863,7 @@ Cost BicycleCost::TransitionCost(const baldr::DirectedEdge* edge,
   const auto stopimpact = edge->stopimpact(idx);
   if (stopimpact > 0) {
     // Increase turn stress depending on the kind of turn that has to be made.
-    uint32_t turn_type = static_cast<uint32_t>(edge->turntype(idx));
+    uint32_t turn_type = RidersTurnType(edge, idx, roundabout, node->drive_on_right());
     float turn_penalty = (node->drive_on_right()) ? kRightSideTurnPenalties[turn_type]
                                                   : kLeftSideTurnPenalties[turn_type];
     turn_stress += turn_penalty;
@@ -817,7 +871,8 @@ Cost BicycleCost::TransitionCost(const baldr::DirectedEdge* edge,
     // Take the higher of the turn degree cost and the crossing cost
     float turn_cost =
         (node->drive_on_right()) ? kRightSideTurnCosts[turn_type] : kLeftSideTurnCosts[turn_type];
-    if (turn_cost < kTCCrossing && edge->edge_to_right(idx) && edge->edge_to_left(idx)) {
+    if (turn_cost < kTCCrossing && !roundabout && edge->edge_to_right(idx) &&
+        edge->edge_to_left(idx)) {
       turn_cost = kTCCrossing;
     }
 
@@ -869,6 +924,8 @@ Cost BicycleCost::TransitionCostReverse(const uint32_t idx,
   // destination only, alley, maneuver penalty
   Cost c = base_transition_cost(node, edge, pred, idx, pred_label.destonly(), opp_edge_destonly);
   c.cost -= DestinationOnlyWaiver(edge, pred, pred_label.destonly(), opp_edge_destonly);
+  const bool roundabout = edge->roundabout() || pred->roundabout();
+  c.cost -= RoundaboutManeuverWaiver(edge, idx, roundabout);
 
   // Reduce penalty to make this turn if the road we are turning on has some kind of bicycle
   // accommodation
@@ -891,7 +948,7 @@ Cost BicycleCost::TransitionCostReverse(const uint32_t idx,
   const auto stopimpact = edge->stopimpact(idx);
   if (stopimpact > 0) {
     // Increase turn stress depending on the kind of turn that has to be made.
-    uint32_t turn_type = static_cast<uint32_t>(edge->turntype(idx));
+    uint32_t turn_type = RidersTurnType(edge, idx, roundabout, node->drive_on_right());
     float turn_penalty = (node->drive_on_right()) ? kRightSideTurnPenalties[turn_type]
                                                   : kLeftSideTurnPenalties[turn_type];
     turn_stress += turn_penalty;
@@ -899,7 +956,8 @@ Cost BicycleCost::TransitionCostReverse(const uint32_t idx,
     // Take the higher of the turn degree cost and the crossing cost
     float turn_cost =
         (node->drive_on_right()) ? kRightSideTurnCosts[turn_type] : kLeftSideTurnCosts[turn_type];
-    if (turn_cost < kTCCrossing && edge->edge_to_right(idx) && edge->edge_to_left(idx)) {
+    if (turn_cost < kTCCrossing && !roundabout && edge->edge_to_right(idx) &&
+        edge->edge_to_left(idx)) {
       turn_cost = kTCCrossing;
     }
 

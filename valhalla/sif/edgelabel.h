@@ -40,7 +40,7 @@ public:
         origin_(0), destination_(0), toll_(0), not_thru_(0), deadend_(0), on_complex_rest_(0),
         closure_pruning_(0), path_id_(0), restriction_idx_(0), internal_turn_(0), unpaved_(0),
         has_measured_speed_(0), hgv_access_(0), bridge_(0), tunnel_(0),
-        destonly_access_restr_mask_(0), cost_(0, 0), sortcost_(0) {
+        destonly_access_restr_mask_(0), roundabout_(0), cost_(0, 0), sortcost_(0) {
     assert(path_id_ <= baldr::kMaxMultiPathId);
   }
 
@@ -92,8 +92,8 @@ public:
         closure_pruning_(closure_pruning), path_id_(path_id), restriction_idx_(restriction_idx),
         internal_turn_(static_cast<uint8_t>(internal_turn)), unpaved_(edge->unpaved()),
         has_measured_speed_(has_measured_speed), hgv_access_(hgv_access), bridge_(edge->bridge()),
-        tunnel_(edge->tunnel()), destonly_access_restr_mask_(destonly_access_restr_mask), cost_(cost),
-        sortcost_(sortcost) {
+        tunnel_(edge->tunnel()), destonly_access_restr_mask_(destonly_access_restr_mask),
+        roundabout_(edge->roundabout()), cost_(cost), sortcost_(sortcost) {
     dest_only_ = destonly ? destonly : edge->destonly();
     assert(path_id_ <= baldr::kMaxMultiPathId);
   }
@@ -232,6 +232,13 @@ public:
    */
   bool destonly() const {
     return dest_only_;
+  }
+
+  /**
+   * Is the edge part of a roundabout?
+   */
+  bool roundabout() const {
+    return roundabout_;
   }
 
   /**
@@ -483,7 +490,10 @@ protected:
   // an access restriction with an exemption for local traffic
   uint32_t destonly_access_restr_mask_ : 7;
 
-  uint32_t spare : 3;
+  // Flag indicating edge is part of a roundabout.
+  uint32_t roundabout_ : 1;
+
+  uint32_t spare : 2;
 
   Cost cost_;      // Cost and elapsed time along the path.
   float sortcost_; // Sort cost - includes A* heuristic.
