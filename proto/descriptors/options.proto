@@ -367,6 +367,16 @@ message Costing {
     oneof has_steps_factor {
       float steps_factor = 99;
     }
+
+    oneof has_road_class_factor {
+      float road_class_factor = 98;
+    }
+
+    repeated float road_class_factors = 100;
+
+    oneof has_bicycle_network_factor {
+      float bicycle_network_factor = 101;
+    }
   }
 
   oneof has_options {

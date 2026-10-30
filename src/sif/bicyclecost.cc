@@ -7,6 +7,7 @@
 #include "sif/costconstants.h"
 #include "sif/hierarchylimits.h"
 
+#include <algorithm>
 #include <cassert>
 
 #ifdef INLINE_TEST
@@ -115,7 +116,8 @@ constexpr float kSurfaceFactors[] = {1.0f, 2.5f, 4.5f, 7.0f};
 // Weighting factor based on road class. These apply penalties to higher class
 // roads. These penalties are modulated by the useroads factor - further
 // avoiding higher class roads for those with low propensity for using roads.
-constexpr float kRoadClassFactor[] = {
+constexpr uint32_t kNumRoadClassFactors = 8;
+constexpr float kRoadClassFactor[kNumRoadClassFactors] = {
     1.0f,  // Motorway
     0.4f,  // Trunk
     0.2f,  // Primary
@@ -197,13 +199,14 @@ constexpr float kAvoidHillsStrength[] = {
 constexpr uint32_t kSpeedPenaltyThreshold = 40; // 40 KPH ~ 25 MPH
 
 // How much to favor bicycle networks.
-constexpr float kBicycleNetworkFactor = 0.95f;
+constexpr ranged_default_t<float> kBicycleNetworkFactorRange{0.0f, 0.95f, 1.0f};
 
 // Valid ranges and defaults
 constexpr ranged_default_t<float> kUseRoadRange{0.0f, kDefaultUseRoad, 1.0f};
 constexpr ranged_default_t<float> kUseHillsRange{0.0f, kDefaultUseHills, 1.0f};
 constexpr ranged_default_t<float> kAvoidBadSurfacesRange{0.0f, kDefaultAvoidBadSurfaces, 1.0f};
 constexpr ranged_default_t<float> kStepsFactorRange{kMinFactor, kDefaultStepsFactor, kMaxFactor};
+constexpr ranged_default_t<float> kRoadClassFactorRange{0.0f, 1.0f, 100.0f};
 
 constexpr ranged_default_t<float> kBSSCostRange{0, kDefaultBssCost, kMaxPenalty};
 constexpr ranged_default_t<float> kBSSPenaltyRange{0, kDefaultBssPenalty, kMaxPenalty};
@@ -421,14 +424,17 @@ public:
   // Hidden in source file so we don't need it to be protected
   // We expose it within the source file for testing purposes
 
-  float use_roads_;           // Preference of using roads between 0 and 1
-  float avoid_roads_;         // Inverse of use roads
-  float road_factor_;         // Road factor based on use_roads_
-  float sidepath_factor_;     // Factor to use when use_sidepath is set on an edge
-  float livingstreet_factor_; // Factor to use for living streets
-  float track_factor_;        // Factor to use tracks
-  float avoid_bad_surfaces_;  // Preference of avoiding bad surfaces for the bike type
-  float steps_factor_;        // Cost factor for steps, applied on top of a 1 kph pace
+  float use_roads_;              // Preference of using roads between 0 and 1
+  float avoid_roads_;            // Inverse of use roads
+  float road_factor_;            // Road factor based on use_roads_
+  float road_class_factor_;      // Scales the stress of tertiary and higher road classes
+  float bicycle_network_factor_; // Scales the stress of edges on a bicycle network
+  float road_class_stress_[kNumRoadClassFactors]; // Stress added by each road class
+  float sidepath_factor_;                         // Factor to use when use_sidepath is set on an edge
+  float livingstreet_factor_;                     // Factor to use for living streets
+  float track_factor_;                            // Factor to use tracks
+  float avoid_bad_surfaces_; // Preference of avoiding bad surfaces for the bike type
+  float steps_factor_;       // Cost factor for steps, applied on top of a 1 kph pace
 
   // Average speed (kph) on smooth, flat roads.
   float speed_;
@@ -525,6 +531,14 @@ BicycleCost::BicycleCost(const Costing& costing)
   // reduce the weight difference between road classes while factors below 0.5
   // start to increase the differences.
   road_factor_ = (use_roads_ >= 0.5f) ? 1.5f - use_roads_ : 2.0f - use_roads_ * 2.0f;
+  road_class_factor_ = costing_options.road_class_factor();
+  bicycle_network_factor_ = costing_options.bicycle_network_factor();
+  const auto& class_factors = costing_options.road_class_factors();
+  for (uint32_t rc = 0; rc < kNumRoadClassFactors; rc++) {
+    const bool major = rc <= static_cast<uint32_t>(RoadClass::kTertiary);
+    const float class_factor = class_factors.empty() ? kRoadClassFactor[rc] : class_factors[rc];
+    road_class_stress_[rc] = road_factor_ * class_factor * (major ? road_class_factor_ : 1.0f);
+  }
 
   // Set edge costing factors
   sidepath_factor_ = 3.0f * (1.0f - use_roads_);
@@ -712,7 +726,7 @@ Cost BicycleCost::EdgeCost(const baldr::DirectedEdge* edge,
     }
 
     // Add in penalization for road classification (higher class roads are more stress)
-    roadway_stress += road_factor_ * kRoadClassFactor[static_cast<uint32_t>(edge->classification())];
+    roadway_stress += road_class_stress_[static_cast<uint32_t>(edge->classification())];
 
     // Multiply by speed so that higher classified roads are more severely punished for being fast.
     // Use the speed assigned to the directed edge. Even if we had traffic information we shouldn't
@@ -726,9 +740,9 @@ Cost BicycleCost::EdgeCost(const baldr::DirectedEdge* edge,
     accommodation_factor += sidepath_factor_;
   }
 
-  // Favor bicycle networks slightly
+  // Favor bicycle networks
   if (edge->bike_network()) {
-    accommodation_factor *= kBicycleNetworkFactor;
+    accommodation_factor *= bicycle_network_factor_;
   }
 
   // Create an edge factor based on total stress (sum of accommodation factor and roadway
@@ -927,6 +941,18 @@ void ParseBicycleCostOptions(const rapidjson::Document& doc,
 
   ParseBaseCostOptions(json, c, kBaseCostOptsConfig, warnings);
   JSON_PBF_RANGED_DEFAULT(co, kUseRoadRange, json, "/use_roads", use_roads, warnings);
+  JSON_PBF_RANGED_DEFAULT(co, kRoadClassFactorRange, json, "/road_class_factor", road_class_factor,
+                          warnings);
+  JSON_PBF_RANGED_DEFAULT(co, kBicycleNetworkFactorRange, json, "/bicycle_network_factor",
+                          bicycle_network_factor, warnings);
+  auto class_factors =
+      rapidjson::get_optional<rapidjson::Value::ConstArray>(json, "/road_class_factors");
+  if (class_factors && class_factors->Size() == kNumRoadClassFactors) {
+    co->clear_road_class_factors();
+    for (const auto& factor : *class_factors) {
+      co->add_road_class_factors(std::clamp(static_cast<float>(factor.GetDouble()), 0.0f, 100.0f));
+    }
+  }
   JSON_PBF_RANGED_DEFAULT(co, kUseHillsRange, json, "/use_hills", use_hills, warnings);
   JSON_PBF_RANGED_DEFAULT(co, kAvoidBadSurfacesRange, json, "/avoid_bad_surfaces", avoid_bad_surfaces,
                           warnings);
@@ -1112,6 +1138,14 @@ defaults.use_ferry_.max));
   for (unsigned i = 0; i < testIterations; ++i) {
     ctorTester.reset(make_bicyclecost_from_json("use_roads", (*distributor)(generator)));
     EXPECT_THAT(ctorTester->use_roads_, test::IsBetween(kUseRoadRange.min, kUseRoadRange.max));
+  }
+
+  // road_class_factor_
+  distributor.reset(make_distributor_from_range(kRoadClassFactorRange));
+  for (unsigned i = 0; i < testIterations; ++i) {
+    ctorTester.reset(make_bicyclecost_from_json("road_class_factor", (*distributor)(generator)));
+    EXPECT_THAT(ctorTester->road_class_factor_,
+                test::IsBetween(kRoadClassFactorRange.min, kRoadClassFactorRange.max));
   }
 
   // speed_
