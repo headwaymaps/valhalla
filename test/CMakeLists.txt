@@ -51,7 +51,7 @@ target_include_directories(valhalla_test SYSTEM PUBLIC
 target_link_libraries(valhalla_test
   valhalla gtest gtest_main gmock
   $<$<BOOL:${ENABLE_COVERAGE}>:gcov>
-  ${CMAKE_THREAD_LIBS_INIT} ${lz4_target})
+  ${CMAKE_THREAD_LIBS_INIT} ${lz4_target} ${zstd_target})
 target_compile_definitions(valhalla_test PUBLIC
   VALHALLA_SOURCE_DIR="${VALHALLA_SOURCE_DIR}/"
   VALHALLA_BUILD_DIR="${VALHALLA_BUILD_DIR}/")
@@ -318,6 +318,7 @@ add_custom_command(OUTPUT test/data/sample/N00
   COMMAND ${CMAKE_COMMAND} -E make_directory test/data/sample/N40
   COMMAND ${CMAKE_COMMAND} -E make_directory test/data/samplegz/N40
   COMMAND ${CMAKE_COMMAND} -E make_directory test/data/samplelz4/N40
+  COMMAND ${CMAKE_COMMAND} -E make_directory test/data/sampledzst/N40
   COMMAND ${CMAKE_COMMAND} -E make_directory test/data/service
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
   COMMENT "Creating test directories")

@@ -8,6 +8,9 @@
 #ifdef ENABLE_LZ4
 #include <lz4frame.h>
 #endif
+#ifdef ENABLE_ZSTD
+#include <zstd.h>
+#endif
 
 #include <cmath>
 #include <filesystem>
@@ -84,6 +87,31 @@ TEST(Sample, create_tile) {
   std::ofstream lzfile("test/data/samplelz4/N40/N40W077.hgt.lz4", std::ios::binary | std::ios::trunc);
   lzfile.write(static_cast<const char*>(static_cast<void*>(lz4_buffer.data())), out_bytes);
 #endif
+
+#ifdef ENABLE_ZSTD
+  // each big-endian height minus the one to its left, as little-endian uint16s
+  const auto* bytes = static_cast<const uint8_t*>(static_cast<void*>(tile.data()));
+  std::vector<uint8_t> residuals(tile.size() * sizeof(int16_t));
+  for (size_t row = 0; row < 3601; ++row) {
+    uint16_t left = 0;
+    for (size_t col = 0; col < 3601; ++col) {
+      size_t i = 2 * (row * 3601 + col);
+      uint16_t height = static_cast<uint16_t>((bytes[i] << 8) | bytes[i + 1]);
+      uint16_t residual = static_cast<uint16_t>(height - left);
+      residuals[i] = static_cast<uint8_t>(residual);
+      residuals[i + 1] = static_cast<uint8_t>(residual >> 8);
+      left = height;
+    }
+  }
+  std::vector<char> zstd_buffer(ZSTD_compressBound(residuals.size()));
+  size_t zstd_bytes =
+      ZSTD_compress(zstd_buffer.data(), zstd_buffer.size(), residuals.data(), residuals.size(), 19);
+  EXPECT_FALSE(ZSTD_isError(zstd_bytes)) << "Can't write zstd elevation tile";
+
+  std::ofstream zstdfile("test/data/sampledzst/N40/N40W077.hgt.dzst",
+                         std::ios::binary | std::ios::trunc);
+  zstdfile.write(zstd_buffer.data(), zstd_bytes);
+#endif
 }
 
 void _get(const std::string& location) {
@@ -122,6 +150,12 @@ TEST(Sample, getgz) {
 #ifdef ENABLE_LZ4
 TEST(Sample, getlz4) {
   _get("test/data/samplelz4");
+};
+#endif
+
+#ifdef ENABLE_ZSTD
+TEST(Sample, getdzst) {
+  _get("test/data/sampledzst");
 };
 #endif
 

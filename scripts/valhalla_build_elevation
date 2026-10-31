@@ -43,6 +43,7 @@ class TileCompression(Enum):
     UNCOMPRESSED = 1
     GZIP = 2
     LZ4 = 3
+    DZST = 4
 
     @property
     def extension(self):
@@ -52,6 +53,8 @@ class TileCompression(Enum):
             return ".gz"
         elif self is TileCompression.LZ4:
             return ".lz4"
+        elif self is TileCompression.DZST:
+            return ".dzst"
 
 
 class DownloadStatus(Enum):
@@ -129,6 +132,12 @@ group.add_argument(
     help="If set, downloaded files will be recompressed with LZ4. Requires lz4. "
     "Requires ~12%% more disk space (216GB total) vs gzip. While you pay upfront in extra CPU and space on the "
     "initial download, tiles will be several times faster to decompress vz gzip.",
+    action="store_true",
+)
+group.add_argument(
+    "--dzst",
+    help="If set, downloaded files will be recompressed as a row delta then zstd level 19. Requires numpy "
+    "and zstandard. Needs ~45%% of gzip's disk space, at a few seconds of CPU per tile.",
     action="store_true",
 )
 
@@ -244,6 +253,17 @@ def get_tiles_with_graph(graph_dir: Path) -> Set[Tile]:
     return tile_infos
 
 
+def row_delta_zstd(hgt: bytes) -> bytes:
+    """Each big-endian height minus the one to its left, as little-endian uint16s, compressed."""
+    import numpy as np
+    import zstandard
+
+    heights = np.frombuffer(hgt, dtype=">u2").reshape(3601, 3601)
+    residuals = heights.astype("<u2")
+    residuals[:, 1:] = heights[:, 1:] - heights[:, :-1]
+    return zstandard.ZstdCompressor(level=19).compress(residuals.tobytes())
+
+
 def download(tile: Tile, output_dir, compression: TileCompression) -> bool:
     dest_directory = Path(output_dir, tile.dir)
     dest_directory.mkdir(parents=True, exist_ok=True)
@@ -252,6 +272,9 @@ def download(tile: Tile, output_dir, compression: TileCompression) -> bool:
     if filepath.is_file():
         # Skip if the file already exists
         return False
+
+    # Only complete tiles take the final name, so a rerun redoes an interrupted one
+    partial_filepath = filepath.with_name(filepath.name + ".partial")
 
     url = f"https://elevation-tiles-prod.s3.us-east-1.amazonaws.com/skadi/{tile.dir}/{tile.name}.gz"
 
@@ -264,7 +287,7 @@ def download(tile: Tile, output_dir, compression: TileCompression) -> bool:
 
             # tries up to 24 mins with exponentially increasing sleeps in between, starting with 5 seconds
             sleep((i**2) / 2 * 30)
-            with request.urlopen(url) as res, open(filepath, "wb") as f:
+            with request.urlopen(url) as res, open(partial_filepath, "wb") as f:
                 if compression is TileCompression.GZIP:
                     f.write(res.read())
                 else:
@@ -294,7 +317,10 @@ def download(tile: Tile, output_dir, compression: TileCompression) -> bool:
                                 f.write(compressor.begin(25934402))
                                 f.write(compressor.compress(uncompressed))
                                 f.write(compressor.flush())
+                        elif compression is TileCompression.DZST:
+                            f.write(row_delta_zstd(uncompressed))
 
+            partial_filepath.rename(filepath)
             download_status = DownloadStatus.OK
             LOGGER.debug(f"Successfully downloaded tile {tile.dir}/{tile.name}")
             break
@@ -306,15 +332,13 @@ def download(tile: Tile, output_dir, compression: TileCompression) -> bool:
                 f"Download failed of elevation tile {tile.dir}/{tile.name}: {e.reason}.\nTrying again.."
             )
             continue
-        except ImportError:
-            LOGGER.critical(
-                "Could not import lz4. Please install lz4 or use another compression format."
-            )
+        except ImportError as e:
+            LOGGER.critical(f"Could not import {e.name}. Please install it or use another compression format.")
             sys.exit(1)
 
     if download_status == DownloadStatus.CORRUPTED:
         LOGGER.error(f"Tile {tile.dir}/{tile.name} was corrupted, removing it...")
-        filepath.unlink()
+        partial_filepath.unlink()
         return False
     elif download_status == DownloadStatus.FAILED:
         LOGGER.error(f"Tile {tile.dir}/{tile.name} couldn't be downloaded...")
@@ -368,6 +392,8 @@ def main():
         tile_compression = TileCompression.UNCOMPRESSED
     elif args.lz4:
         tile_compression = TileCompression.LZ4
+    elif args.dzst:
+        tile_compression = TileCompression.DZST
 
     LOGGER.debug(sorted(tiles, key=lambda x: x.name))
 

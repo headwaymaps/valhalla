@@ -33,6 +33,7 @@ env DEBIAN_FRONTEND=noninteractive sudo apt install --yes --quiet \
     libsqlite3-mod-spatialite \
     libtool \
     libzmq3-dev \
+    libzstd-dev \
     lld \
     locales \
     luajit \
