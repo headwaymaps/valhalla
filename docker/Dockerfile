@@ -81,7 +81,7 @@ LABEL org.opencontainers.image.source="https://github.com/valhalla/valhalla"
 RUN export DEBIAN_FRONTEND=noninteractive && apt update && \
   apt install -y \
   libcurl4 libczmq4 libluajit-5.1-2 libgeotiff5 \
-  libprotobuf-lite32 libsqlite3-0 libsqlite3-mod-spatialite libzmq5 zlib1g \
+  libprotobuf-lite32 libsqlite3-0 libsqlite3-mod-spatialite libzmq5 libzstd1 zlib1g \
   curl locales parallel python3-minimal python-is-python3 python3-shapely python3-requests \
   spatialite-bin unzip wget
 

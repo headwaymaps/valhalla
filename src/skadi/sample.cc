@@ -11,6 +11,9 @@
 #ifdef ENABLE_LZ4
 #include <lz4frame.h>
 #endif
+#ifdef ENABLE_ZSTD
+#include <zstd.h>
+#endif
 #include <sys/stat.h>
 
 #include <cmath>
@@ -44,6 +47,21 @@ int16_t flip(int16_t value) {
   return ((value & 0xFF) << 8) | ((value >> 8) & 0xFF);
 }
 
+// A .hgt.dzst holds each height minus the one to its left (zero before a row's first), as
+// little-endian uint16s. Turns them back into HGT's big-endian heights, in place.
+void undo_row_delta(char* buffer) {
+  auto* bytes = reinterpret_cast<uint8_t*>(buffer);
+  for (size_t row = 0; row < HGT_DIM; ++row) {
+    uint16_t height = 0;
+    for (size_t col = 0; col < HGT_DIM; ++col) {
+      auto* pixel = bytes + sizeof(int16_t) * (row * HGT_DIM + col);
+      height = static_cast<uint16_t>(height + (pixel[0] | (pixel[1] << 8)));
+      pixel[0] = static_cast<uint8_t>(height >> 8);
+      pixel[1] = static_cast<uint8_t>(height);
+    }
+  }
+}
+
 uint64_t file_size(const std::string& file_name) {
   // TODO: detect gzip and actually validate the uncompressed size?
   struct stat s {};
@@ -56,7 +74,7 @@ uint64_t file_size(const std::string& file_name) {
 namespace valhalla {
 namespace skadi {
 
-enum class format_t { UNKNOWN = 0, RAW = 1, GZIP = 2, LZ4 = 3 };
+enum class format_t { UNKNOWN = 0, RAW = 1, GZIP = 2, LZ4 = 3, DZST = 4 };
 
 class cache_item_t {
 private:
@@ -156,6 +174,21 @@ public:
       format = format_t::UNKNOWN;
       return false;
 #endif
+    } else if (format == format_t::DZST) {
+#ifdef ENABLE_ZSTD
+      auto* heights = const_cast<char*>(this->unpacked);
+      auto size = ZSTD_decompress(heights, HGT_BYTES, data.get(), data.size());
+      if (ZSTD_isError(size) || size != HGT_BYTES) {
+        LOG_WARN("Corrupt zstd elevation data");
+        format = format_t::UNKNOWN;
+        return false;
+      }
+      undo_row_delta(heights);
+#else
+      LOG_WARN("zstd elevation data found but zstd support is not compiled in");
+      format = format_t::UNKNOWN;
+      return false;
+#endif
     } else {
       LOG_WARN("Corrupt elevation data of unknown type");
       format = format_t::UNKNOWN;
@@ -167,7 +200,7 @@ public:
 
   static std::optional<std::pair<uint16_t, format_t>> parse_hgt_name(const std::string& name) {
     std::smatch m;
-    std::regex e(".*[/\\\\]([NS])([0-9]{2})([WE])([0-9]{3})\\.hgt(\\.(gz|lz4))?$");
+    std::regex e(".*[/\\\\]([NS])([0-9]{2})([WE])([0-9]{3})\\.hgt(\\.(gz|lz4|dzst))?$");
     if (std::regex_search(name, m, e)) {
       // enum class format_t{ UNKNOWN = 0, GZIP = 1, RAW = 3, LZ4 = 4 };
       format_t fmt;
@@ -176,6 +209,8 @@ public:
           fmt = format_t::GZIP;
         } else if (m[5] == ".lz4") {
           fmt = format_t::LZ4;
+        } else if (m[5] == ".dzst") {
+          fmt = format_t::DZST;
         } else {
           fmt = format_t::UNKNOWN;
         }
