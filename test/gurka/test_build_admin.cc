@@ -470,3 +470,35 @@ TEST(AdminTest, TestBuildAdminFromPBF) {
     EXPECT_EQ(one_admin.country_text(), "None");
   }
 }
+
+TEST(AdminTest, MissingAdminDbDrivingSide) {
+  const std::string ascii_map = R"(
+    A----B----C
+  )";
+  const gurka::ways ways = {{"AB", {{"highway", "primary"}}}, {"BC", {{"highway", "primary"}}}};
+  const auto layout = gurka::detail::map_to_coordinates(ascii_map, 100);
+  const std::string workdir = "test/data/missing_admin_db";
+  auto map = gurka::buildtiles(layout, ways, {}, {}, workdir,
+                               {{"mjolnir.admin", workdir + "/no_such_admin.sqlite"},
+                                {"mjolnir.data_processing.use_admin_db", "true"}});
+
+  GraphReader reader(map.config.get_child("mjolnir"));
+  for (const auto& name : {"A", "B", "C"}) {
+    EXPECT_FALSE(reader.nodeinfo(gurka::findNode(reader, map.nodes, name))->drive_on_right()) << name;
+  }
+}
+
+TEST(AdminTest, DisabledAdminDbDrivingSide) {
+  const std::string ascii_map = R"(
+    A----B----C
+  )";
+  const gurka::ways ways = {{"AB", {{"highway", "primary"}}}, {"BC", {{"highway", "primary"}}}};
+  const auto layout = gurka::detail::map_to_coordinates(ascii_map, 100);
+  auto map = gurka::buildtiles(layout, ways, {}, {}, "test/data/disabled_admin_db",
+                               {{"mjolnir.data_processing.use_admin_db", "false"}});
+
+  GraphReader reader(map.config.get_child("mjolnir"));
+  for (const auto& name : {"A", "B", "C"}) {
+    EXPECT_TRUE(reader.nodeinfo(gurka::findNode(reader, map.nodes, name))->drive_on_right()) << name;
+  }
+}
