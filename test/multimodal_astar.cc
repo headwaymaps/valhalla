@@ -146,15 +146,16 @@ TEST(AstarBss, test_With_Mode_Changes) {
                                                 TravelMode::kPedestrian};
 
   std::vector<std::string> expected_route{"Rue Gabriel Vicaire", "Rue Perrée",
-                                          "Rue Perrée",          "Rue Caffarelli",
-                                          "Rue de Bretagne",     "Rue de Turenne",
-                                          "Rue du Parc Royal",   "Place de Thorigny",
-                                          "Rue de la Perle",     "Rue de la Perle"};
+                                          "Rue Perrée",          "Rue Perrée",
+                                          "Rue Caffarelli",      "Rue de Bretagne",
+                                          "Rue de Turenne",      "Rue du Parc Royal",
+                                          "Place de Thorigny",   "Rue de la Perle",
+                                          "Rue de la Perle"};
 
   const std::map<size_t, BssManeuverType>&
       expected_bss_maneuver{{2, DirectionsLeg_Maneuver_BssManeuverType_kRentBikeAtBikeShare},
-                            {9, DirectionsLeg_Maneuver_BssManeuverType_kReturnBikeAtBikeShare}};
-  const std::map<size_t, std::string>& expected_bss_ref{{2, "3006"}, {9, "3008"}};
+                            {10, DirectionsLeg_Maneuver_BssManeuverType_kReturnBikeAtBikeShare}};
+  const std::map<size_t, std::string>& expected_bss_ref{{2, "3006"}, {10, "3008"}};
 
   test_request(request, expected_travel_modes, expected_route, expected_bss_maneuver,
                expected_bss_ref);
@@ -318,8 +319,7 @@ TEST(AstarBss, test_BSSConnections_on_Pedestrian_and_Bicycle) {
   std::vector<std::string> expected_route{"Rue Perrée",
                                           "Rue Perrée",
                                           "Rue Perrée",
-                                          "Rue Eugène Spuller",
-                                          "Rue Béranger",
+                                          "Rue Perrée",
                                           "Rue du Temple",
                                           "Place de la République",
                                           "Place de la République",
@@ -329,12 +329,12 @@ TEST(AstarBss, test_BSSConnections_on_Pedestrian_and_Bicycle) {
 
   const std::map<size_t, BssManeuverType>&
       expected_bss_maneuver{{2, DirectionsLeg_Maneuver_BssManeuverType_kRentBikeAtBikeShare},
-                            {11, DirectionsLeg_Maneuver_BssManeuverType_kReturnBikeAtBikeShare}};
+                            {10, DirectionsLeg_Maneuver_BssManeuverType_kReturnBikeAtBikeShare}};
 
-  const std::map<size_t, std::string>& expected_bss_ref{{2, "3006"}, {11, "10011"}};
+  const std::map<size_t, std::string>& expected_bss_ref{{2, "3006"}, {10, "10011"}};
 
   std::string expected_shape =
-      "e~le|A_ldoCyD~IoAtCkArC]z@kBpEeAsAdArAjBqE\\{@jAsCad@ai@yAgBo@iCuF_Ua@_B[uAyQgz@i@cCwAt@mg@bXyt@b`@yCvAyBqH{EgLiCvEoD|G{\\`r@wFqHoPqTy@gAyAkBe@o@i@q@{D_CeB{@wCfC{XfVt@jCjA~Dn@xB?lBcA|BV\\f@r@wBlE";
+      "e~le|A_ldoCyD~IoAtCkArC]z@kBpEeAsAdArA}HfReLrYsAjDcLbXo@|A}BrFmGmGwCyCeUeUu@{@wBaCyA{Ac@a@}I_IoDqDsOeQgCiDeBaCaAkByAgDkAoCi@mAWk@aAyBSe@y@eDgSsv@sAyEyBqH{EgLiCvEoD|G{\\`r@wFqHoPqTy@gAyAkBe@o@i@q@{D_CeB{@wCfC{XfVt@jCjA~Dn@xB?lBcA|BX\\d@r@wBlE";
 
   test_request(request, expected_travel_modes, expected_route, expected_bss_maneuver,
                expected_bss_ref, expected_shape);

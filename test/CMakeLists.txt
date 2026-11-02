@@ -242,7 +242,7 @@ add_custom_target(utrecht_tiles DEPENDS ${CMAKE_BINARY_DIR}/test/data/utrecht_ti
 set_target_properties(utrecht_tiles PROPERTIES FOLDER "Tests")
 
 valhalla_test_config(whitelion_tiles
-  [=[{"mjolnir":{"id_table_size":1000,"tile_dir":"test/data/whitelion_tiles","hierarchy":true,"shortcuts":true,"concurrency":1}}]=]
+  [=[{"mjolnir":{"id_table_size":1000,"tile_dir":"test/data/whitelion_tiles","admin":"${VALHALLA_SOURCE_DIR}/test/data/language_admin.sqlite","hierarchy":true,"shortcuts":true,"concurrency":1}}]=]
   whitelion_tiles_cfg)
 add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/test/data/whitelion_tiles/2/000/814/309.gph
   COMMAND $<TARGET_FILE:valhalla_build_tiles>
@@ -255,7 +255,7 @@ add_custom_target(whitelion_tiles DEPENDS ${CMAKE_BINARY_DIR}/test/data/whitelio
 set_target_properties(whitelion_tiles PROPERTIES FOLDER "Tests")
 
 valhalla_test_config(whitelion_tiles_reverse
-  [=[{"mjolnir":{"id_table_size":1000,"tile_dir":"test/data/whitelion_tiles_reverse","hierarchy":true,"shortcuts":true,"concurrency":1}}]=]
+  [=[{"mjolnir":{"id_table_size":1000,"tile_dir":"test/data/whitelion_tiles_reverse","admin":"${VALHALLA_SOURCE_DIR}/test/data/language_admin.sqlite","hierarchy":true,"shortcuts":true,"concurrency":1}}]=]
   whitelion_tiles_reverse_cfg)
 add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/test/data/whitelion_tiles_reverse/2/000/814/309.gph
   COMMAND $<TARGET_FILE:valhalla_build_tiles>
@@ -268,7 +268,7 @@ add_custom_target(reversed_whitelion_tiles DEPENDS ${CMAKE_BINARY_DIR}/test/data
 set_target_properties(reversed_whitelion_tiles PROPERTIES FOLDER "Tests")
 
 valhalla_test_config(bayfront_singapore_tiles
-  [=[{"mjolnir":{"id_table_size":1000,"tile_dir":"test/data/bayfront_singapore_tiles","hierarchy":true,"shortcuts":true,"concurrency":1}}]=]
+  [=[{"mjolnir":{"id_table_size":1000,"tile_dir":"test/data/bayfront_singapore_tiles","admin":"${VALHALLA_SOURCE_DIR}/test/data/language_admin.sqlite","hierarchy":true,"shortcuts":true,"concurrency":1}}]=]
   bayfront_singapore_tiles_cfg)
 add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/test/data/bayfront_singapore_tiles/1/033/043.gph
   COMMAND $<TARGET_FILE:valhalla_build_tiles>

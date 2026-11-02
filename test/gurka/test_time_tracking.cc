@@ -193,8 +193,8 @@ TEST(TimeTracking, routes) {
   auto map = gurka::buildtiles(layout, ways, {}, {}, "test/data/gurka_time_tracking_make",
                                {{"mjlonir.timezone", "test/data/tz.sqlite"}});
 
-  const std::vector<double> expected = {0,       31.5771, 63.1543, 94.7314, 120.052, 0,
-                                        91.6466, 105.024, 144.325, 159.079, 173.815, 188.551};
+  const std::vector<double> expected = {0,       31.5771, 63.1543, 94.7314, 120.041, 0,
+                                        91.6466, 105.024, 144.232, 158.974, 173.710, 188.446};
 
   auto test_result = [&expected](const std::vector<double>& actual_times, const Api& request) {
     ASSERT_THAT(actual_times, testing::Pointwise(testing::DoubleNear(0.001), expected));

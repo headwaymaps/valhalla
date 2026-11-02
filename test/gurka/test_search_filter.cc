@@ -19,8 +19,6 @@ protected:
   static void SetUpTestSuite() {
     constexpr double gridsize = 100;
 
-    // remark: without admin database, left-side driving is the
-    // default driving side.
     const std::string ascii_map = R"(
     B---------C
     |   2   8 |
@@ -103,7 +101,7 @@ TEST_F(SearchFilter, PreferredSide) {
   auto to = "8";
 
   const std::string& request = std::format(
-      R"({{"locations":[{{"lat":{:.6f},"lon":{:.6f}}},{{"lat":{:.6f},"lon":{:.6f},"preferred_side":"same"}}],"costing":"auto"}})",
+      R"({{"locations":[{{"lat":{:.6f},"lon":{:.6f}}},{{"lat":{:.6f},"lon":{:.6f},"preferred_side":"opposite"}}],"costing":"auto"}})",
       map.nodes.at(from).lat(), map.nodes.at(from).lng(), map.nodes.at(to).lat(),
       map.nodes.at(to).lng());
   auto result = gurka::do_action(valhalla::Options::route, map, request);
@@ -117,7 +115,7 @@ TEST_F(SearchFilter, StreetSideCutoff) {
   auto to = "8";
 
   const std::string& request = std::format(
-      R"({{"locations":[{{"lat":{:.6f},"lon":{:.6f}}},{{"lat":{:.6f},"lon":{:.6f},"preferred_side":"same","street_side_cutoff":"primary"}}],"costing":"auto"}})",
+      R"({{"locations":[{{"lat":{:.6f},"lon":{:.6f}}},{{"lat":{:.6f},"lon":{:.6f},"preferred_side":"opposite","street_side_cutoff":"primary"}}],"costing":"auto"}})",
       map.nodes.at(from).lat(), map.nodes.at(from).lng(), map.nodes.at(to).lat(),
       map.nodes.at(to).lng());
   auto result = gurka::do_action(valhalla::Options::route, map, request);

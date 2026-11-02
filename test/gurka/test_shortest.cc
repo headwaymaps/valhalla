@@ -13,7 +13,7 @@ protected:
     constexpr double gridsize = 10;
 
     const std::string ascii_map = R"(
-          H-------------I
+          F-------------G
           |             |
           |             |
           |             |
@@ -21,7 +21,7 @@ protected:
           |             |
           |             |
           |             |
-          F-------------G
+          H-------------I
     )";
 
     const gurka::ways ways = {

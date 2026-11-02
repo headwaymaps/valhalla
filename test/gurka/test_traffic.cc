@@ -37,7 +37,7 @@ TEST(Traffic, BasicUpdates) {
                                    {{"/date_time/type", "0"}}, clean_reader);
     gurka::assert::osrm::expect_steps(result, {"AB"});
     gurka::assert::raw::expect_path(result, {"AB", "BC"});
-    gurka::assert::raw::expect_eta(result, 360.0177);
+    gurka::assert::raw::expect_eta(result, 360.0069);
   }
   std::cout << "[          ] Make some updates to the traffic .tar file. "
                "Mostly just updates every edge in the file to 24km/h, except for one "
@@ -89,7 +89,7 @@ TEST(Traffic, BasicUpdates) {
                                    {{"/date_time/type", "0"}}, clean_reader);
     gurka::assert::osrm::expect_steps(result, {"AB"});
     gurka::assert::raw::expect_path(result, {"AB", "BC"});
-    gurka::assert::raw::expect_eta(result, 25.731991);
+    gurka::assert::raw::expect_eta(result, 25.721207);
   }
 
   std::cout << "[          ] Back to previous speed" << std::endl;
@@ -101,7 +101,7 @@ TEST(Traffic, BasicUpdates) {
         gurka::do_action(valhalla::Options::route, map, {"A", "C"}, "auto", {}, clean_reader);
     gurka::assert::osrm::expect_steps(result, {"AB"});
     gurka::assert::raw::expect_path(result, {"AB", "BC"});
-    gurka::assert::raw::expect_eta(result, 360.0177);
+    gurka::assert::raw::expect_eta(result, 360.0069);
   }
 
   std::cout << "[          ] Now do another route with the same (not restarted) actor to see if "

@@ -11,11 +11,11 @@ TEST(Standalone, avoid_service) {
   // Test to make sure bicycle routes do not use highway:service to cut
   // corners near intersections
   const std::string ascii_map = R"(
-    A----B----C
-         |    |
-         D----E
+              F
               |
-              F)";
+         D----E
+         |    |
+    A----B----C)";
 
   const gurka::ways ways = {{"AB", {{"highway", "secondary"}}}, {"BC", {{"highway", "secondary"}}},
                             {"CE", {{"highway", "tertiary"}}},  {"EF", {{"highway", "tertiary"}}},

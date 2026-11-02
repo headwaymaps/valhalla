@@ -116,14 +116,14 @@ TEST(Standalone, TurnLanesSplitLane) {
   // A -> C - takes the leftmost left lane
   result = gurka::do_action(valhalla::Options::route, map, {"A", "C"}, "auto");
   validate_turn_lanes(result, {
-                                  {3, "[ *left* ACTIVE | *left*;through VALID | through;right ]"},
+                                  {3, "[ *left* VALID | *left*;through ACTIVE | through;right ]"},
                                   {0, ""},
                               });
 
   // A -> E - takes the leftmost through lane
   result = gurka::do_action(valhalla::Options::route, map, {"A", "E"}, "auto");
   validate_turn_lanes(result, {
-                                  {3, "[ left | left;*through* ACTIVE | *through*;right VALID ]"},
+                                  {3, "[ left | left;*through* VALID | *through*;right ACTIVE ]"},
                                   {0, ""}, // TODO lanes are tossed when all are through
                               });
 
@@ -180,9 +180,9 @@ TEST(Standalone, TurnLanesSharedTurnLane) {
   // A -> G  - only through lanes should be active throughout
   auto result = gurka::do_action(valhalla::Options::route, map, {"A", "G"}, "auto");
   validate_turn_lanes(result, {
-                                  {3, "[ *through* ACTIVE | *through* VALID | right ]"},
-                                  {3, "[ *through* ACTIVE | *through* VALID | right ]"},
-                                  {3, "[ *through* ACTIVE | *through* VALID | right ]"},
+                                  {3, "[ *through* VALID | *through* ACTIVE | right ]"},
+                                  {3, "[ *through* VALID | *through* ACTIVE | right ]"},
+                                  {3, "[ *through* VALID | *through* ACTIVE | right ]"},
                                   {0, ""},
                               });
 
@@ -298,9 +298,12 @@ TEST(Standalone, TurnLanesMultiLaneShort) {
                                   {0, ""},
                               });
 
-  // makes the data left side driving.
-  map = gurka::buildtiles(layout, ways, {}, {}, "test/data/gurka_turn_lanes_5",
-                          {{"mjolnir.data_processing.use_admin_db", "true"}});
+  gurka::ways left_side_ways = ways;
+  for (auto& [name, tags] : left_side_ways) {
+    tags["driving_side"] = "left";
+  }
+  map = gurka::buildtiles(layout, left_side_ways, {}, {}, "test/data/gurka_turn_lanes_5",
+                          {{"mjolnir.data_processing.use_admin_db", "false"}});
 
   // A -> F - takes leftmost right lane (left side driving)
   result = gurka::do_action(valhalla::Options::route, map, {"A", "F"}, "auto");
@@ -717,7 +720,7 @@ TEST(Standalone, TurnLanesSerializedResponse) {
   {
     // A->E : Both right lanes should be valid and left-most right lane should
     // be active. For following step, both left lanes should be valid and the
-    // left-most left lane should be active.
+    // right-most left lane should be active.
     auto result = gurka::do_action(valhalla::Options::route, map, {"A", "E"}, "auto");
     rapidjson::Document directions = gurka::convert_to_json(result, valhalla::Options_Format_osrm);
 
@@ -763,19 +766,16 @@ TEST(Standalone, TurnLanesSerializedResponse) {
       ASSERT_EQ(step2_int0["lanes"].Size(), 3);
 
       verify_lane_schema(step2_int0["lanes"]);
-      // lane 0 - active: true, valid: true
-      EXPECT_TRUE(step2_int0["lanes"][0]["active"].GetBool());
+      // lane 0 - active: false, valid: true
+      EXPECT_FALSE(step2_int0["lanes"][0]["active"].GetBool());
       EXPECT_TRUE(step2_int0["lanes"][0]["valid"].GetBool());
       ASSERT_EQ(step2_int0["lanes"][0]["indications"].Size(), 2);
-      // TODO: Note that the order of the indications array is reverse, ["left", "uturn"]
-      // when it should be ["uturn", "left"]. This is due to not knowing whether a uturn
-      // is a left or right uturn in serialization.
-      EXPECT_EQ(step2_int0["lanes"][0]["indications"][0].GetString(), std::string("left"));
-      EXPECT_EQ(step2_int0["lanes"][0]["indications"][1].GetString(), std::string("uturn"));
+      EXPECT_EQ(step2_int0["lanes"][0]["indications"][0].GetString(), std::string("uturn"));
+      EXPECT_EQ(step2_int0["lanes"][0]["indications"][1].GetString(), std::string("left"));
       EXPECT_TRUE(step2_int0["lanes"][0].HasMember("valid_indication"));
       EXPECT_EQ(step2_int0["lanes"][0]["valid_indication"].GetString(), std::string("left"));
       // lane 1 - active: true, valid: true, active_ind: left
-      EXPECT_FALSE(step2_int0["lanes"][1]["active"].GetBool());
+      EXPECT_TRUE(step2_int0["lanes"][1]["active"].GetBool());
       EXPECT_TRUE(step2_int0["lanes"][1]["valid"].GetBool());
       ASSERT_EQ(step2_int0["lanes"][1]["indications"].Size(), 2);
       EXPECT_EQ(step2_int0["lanes"][1]["indications"][0].GetString(), std::string("left"));
@@ -813,11 +813,8 @@ TEST(Standalone, TurnLanesSerializedResponse) {
       EXPECT_TRUE(step0_int1["lanes"][0]["active"].GetBool());
       EXPECT_TRUE(step0_int1["lanes"][0]["valid"].GetBool());
       ASSERT_EQ(step0_int1["lanes"][0]["indications"].Size(), 2);
-      // TODO: Note that the order of the indications array is reverse, ["left", "uturn"]
-      // when it should be ["uturn", "left"]. This is due to not knowing whether a uturn
-      // is a left or right uturn in serialization.
-      EXPECT_EQ(step0_int1["lanes"][0]["indications"][0].GetString(), std::string("left"));
-      EXPECT_EQ(step0_int1["lanes"][0]["indications"][1].GetString(), std::string("uturn"));
+      EXPECT_EQ(step0_int1["lanes"][0]["indications"][0].GetString(), std::string("uturn"));
+      EXPECT_EQ(step0_int1["lanes"][0]["indications"][1].GetString(), std::string("left"));
       ASSERT_TRUE(step0_int1["lanes"][0].HasMember("valid_indication"));
       EXPECT_EQ(step0_int1["lanes"][0]["valid_indication"].GetString(), std::string("uturn"));
       // lane 1 - active: false, valid: false
@@ -846,11 +843,8 @@ TEST(Standalone, TurnLanesSerializedResponse) {
       EXPECT_TRUE(step1_int0["lanes"][0]["active"].GetBool());
       EXPECT_TRUE(step1_int0["lanes"][0]["valid"].GetBool());
       ASSERT_EQ(step1_int0["lanes"][0]["indications"].Size(), 2);
-      // TODO: Note that the order of the indications array is reverse, ["left", "uturn"]
-      // when it should be ["uturn", "left"]. This is due to not knowing whether a uturn
-      // is a left or right uturn in serialization.
-      EXPECT_EQ(step1_int0["lanes"][0]["indications"][0].GetString(), std::string("left"));
-      EXPECT_EQ(step1_int0["lanes"][0]["indications"][1].GetString(), std::string("uturn"));
+      EXPECT_EQ(step1_int0["lanes"][0]["indications"][0].GetString(), std::string("uturn"));
+      EXPECT_EQ(step1_int0["lanes"][0]["indications"][1].GetString(), std::string("left"));
       ASSERT_TRUE(step1_int0["lanes"][0].HasMember("valid_indication"));
       EXPECT_EQ(step1_int0["lanes"][0]["valid_indication"].GetString(), std::string("uturn"));
       // lane 1 - active: false, valid: false
@@ -898,8 +892,11 @@ TEST(Standalone, TurnLanesSerializedResponse) {
       EXPECT_TRUE(step0_int1["lanes"][1]["active"].GetBool());
       EXPECT_TRUE(step0_int1["lanes"][1]["valid"].GetBool());
       ASSERT_EQ(step0_int1["lanes"][1]["indications"].Size(), 2);
-      EXPECT_EQ(step0_int1["lanes"][1]["indications"][0].GetString(), std::string("right"));
-      EXPECT_EQ(step0_int1["lanes"][1]["indications"][1].GetString(), std::string("uturn"));
+      // TODO: Note that the order of the indications array is reverse, ["uturn", "right"]
+      // when it should be ["right", "uturn"]. This is due to not knowing whether a uturn
+      // is a left or right uturn in serialization.
+      EXPECT_EQ(step0_int1["lanes"][1]["indications"][0].GetString(), std::string("uturn"));
+      EXPECT_EQ(step0_int1["lanes"][1]["indications"][1].GetString(), std::string("right"));
       EXPECT_TRUE(step0_int1["lanes"][1].HasMember("valid_indication"));
       EXPECT_EQ(step0_int1["lanes"][1]["valid_indication"].GetString(), std::string("uturn"));
     }
@@ -922,8 +919,11 @@ TEST(Standalone, TurnLanesSerializedResponse) {
       EXPECT_TRUE(step1_int0["lanes"][1]["active"].GetBool());
       EXPECT_TRUE(step1_int0["lanes"][1]["valid"].GetBool());
       ASSERT_EQ(step1_int0["lanes"][1]["indications"].Size(), 2);
-      EXPECT_EQ(step1_int0["lanes"][1]["indications"][0].GetString(), std::string("right"));
-      EXPECT_EQ(step1_int0["lanes"][1]["indications"][1].GetString(), std::string("uturn"));
+      // TODO: Note that the order of the indications array is reverse, ["uturn", "right"]
+      // when it should be ["right", "uturn"]. This is due to not knowing whether a uturn
+      // is a left or right uturn in serialization.
+      EXPECT_EQ(step1_int0["lanes"][1]["indications"][0].GetString(), std::string("uturn"));
+      EXPECT_EQ(step1_int0["lanes"][1]["indications"][1].GetString(), std::string("right"));
       EXPECT_TRUE(step1_int0["lanes"][1].HasMember("valid_indication"));
       EXPECT_EQ(step1_int0["lanes"][1]["valid_indication"].GetString(), std::string("uturn"));
     }

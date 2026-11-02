@@ -50,7 +50,7 @@ TEST(Standalone, BirectionalDeadend) {
                                                   DirectionsLeg_Maneuver_Type_kRight,
                                                   DirectionsLeg_Maneuver_Type_kDestinationLeft,
                                                   DirectionsLeg_Maneuver_Type_kStartLeft,
-                                                  DirectionsLeg_Maneuver_Type_kUturnRight,
+                                                  DirectionsLeg_Maneuver_Type_kUturnLeft,
                                                   DirectionsLeg_Maneuver_Type_kRight,
                                                   DirectionsLeg_Maneuver_Type_kDestination});
   }
@@ -73,7 +73,7 @@ TEST(Standalone, BirectionalDeadend) {
                                                   DirectionsLeg_Maneuver_Type_kRight,
                                                   DirectionsLeg_Maneuver_Type_kDestinationLeft,
                                                   DirectionsLeg_Maneuver_Type_kStartLeft,
-                                                  DirectionsLeg_Maneuver_Type_kUturnRight,
+                                                  DirectionsLeg_Maneuver_Type_kUturnLeft,
                                                   DirectionsLeg_Maneuver_Type_kRight,
                                                   DirectionsLeg_Maneuver_Type_kDestination});
   }
@@ -128,7 +128,7 @@ TEST(Standalone, BirectionalDeadend) {
                                                   DirectionsLeg_Maneuver_Type_kRight,
                                                   DirectionsLeg_Maneuver_Type_kDestination,
                                                   DirectionsLeg_Maneuver_Type_kStart,
-                                                  DirectionsLeg_Maneuver_Type_kUturnRight,
+                                                  DirectionsLeg_Maneuver_Type_kUturnLeft,
                                                   DirectionsLeg_Maneuver_Type_kLeft,
                                                   DirectionsLeg_Maneuver_Type_kDestination});
   }

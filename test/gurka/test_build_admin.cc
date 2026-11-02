@@ -463,7 +463,7 @@ TEST(AdminTest, TestBuildAdminFromPBF) {
     auto one_id = findNode(graph_reader, admin_map.nodes, "1");
     EXPECT_TRUE(one_id.is_valid());
     const auto* one = graph_reader.nodeinfo(one_id);
-    EXPECT_EQ(one->drive_on_right(), false);
+    EXPECT_EQ(one->drive_on_right(), true);
     EXPECT_EQ(one->named_intersection(), false);
     AdminInfo one_admin = graph_reader.GetGraphTile(one_id)->admininfo(one->admin_index());
     EXPECT_EQ(one_admin.state_text(), "None");
@@ -484,7 +484,7 @@ TEST(AdminTest, MissingAdminDbDrivingSide) {
 
   GraphReader reader(map.config.get_child("mjolnir"));
   for (const auto& name : {"A", "B", "C"}) {
-    EXPECT_FALSE(reader.nodeinfo(gurka::findNode(reader, map.nodes, name))->drive_on_right()) << name;
+    EXPECT_TRUE(reader.nodeinfo(gurka::findNode(reader, map.nodes, name))->drive_on_right()) << name;
   }
 }
 

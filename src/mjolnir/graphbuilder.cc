@@ -724,7 +724,8 @@ void BuildTileSet(const std::string& ways_file,
             std::swap(source, target);
           }
 
-          if (!use_admin_db)
+          // No admin covers this node: the admin db is disabled, missing, or has no polygon here
+          if (admin_index == 0)
             dor = w.drive_on_right();
 
           // Speed values are already clamped to kMaxAssumedSpeed (140) in OSMWay setters.

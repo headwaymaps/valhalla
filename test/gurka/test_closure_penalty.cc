@@ -181,8 +181,8 @@ TEST_P(ClosurePenalty, AvoidClosure) {
         closure_map.nodes.at("1").lat(), closure_map.nodes.at("1").lng(),
         closure_map.nodes.at("2").lat(), closure_map.nodes.at("2").lng(), costing, costing);
 
-    std::vector<std::string> expected_path = {"QT", "TU", "RU", "OR", "LO",
-                                              "IL", "FI", "CF", "BC", "BE"};
+    std::vector<std::string> expected_path = {"QT", "ST", "PS", "MP", "JM",
+                                              "GJ", "DG", "AD", "AB", "BE"};
     auto result =
         gurka::do_action(valhalla::Options::route, closure_map, req_include_closures, reader);
     gurka::assert::raw::expect_path(result, expected_path);

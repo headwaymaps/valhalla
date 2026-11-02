@@ -61,8 +61,8 @@ TEST(Standalone, UturnMatch) {
     // throughs or vias will make a uturn without a destination notification (left hand driving)
     std::vector<DirectionsLeg::Maneuver::Type> expected_maneuvers{
         DirectionsLeg::Maneuver::kStart,
-        DirectionsLeg::Maneuver::kUturnRight,
-        DirectionsLeg::Maneuver::kUturnRight,
+        DirectionsLeg::Maneuver::kUturnLeft,
+        DirectionsLeg::Maneuver::kUturnLeft,
         DirectionsLeg::Maneuver::kDestination,
     };
     expected_names = {"AB", "AB", "AB"};
@@ -79,9 +79,9 @@ TEST(Standalone, UturnMatch) {
     else if (test_case.first == "break_through") {
       expected_maneuvers = {
           DirectionsLeg::Maneuver::kStart,       DirectionsLeg::Maneuver::kDestination,
-          DirectionsLeg::Maneuver::kStart,       DirectionsLeg::Maneuver::kUturnRight,
+          DirectionsLeg::Maneuver::kStart,       DirectionsLeg::Maneuver::kUturnLeft,
           DirectionsLeg::Maneuver::kDestination, DirectionsLeg::Maneuver::kStart,
-          DirectionsLeg::Maneuver::kUturnRight,  DirectionsLeg::Maneuver::kDestination,
+          DirectionsLeg::Maneuver::kUturnLeft,   DirectionsLeg::Maneuver::kDestination,
       };
       expected_names = {"AB", "AB", "AB", "AB", "AB"};
     }

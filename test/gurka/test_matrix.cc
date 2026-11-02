@@ -558,7 +558,7 @@ TEST(StandAlone, CostMatrixDeadends) {
   {
     [[maybe_unused]] auto result =
         gurka::do_action(valhalla::Options::sources_to_targets, map, {"1"}, {"B"}, "auto",
-                         {{"/sources/0/preferred_side", "opposite"}}, nullptr, &res);
+                         {{"/sources/0/preferred_side", "same"}}, nullptr, &res);
     res_doc.Parse(res.c_str());
     check_matrix(res_doc, {0.8f}, false, "distance", Matrix::CostMatrix);
   }
