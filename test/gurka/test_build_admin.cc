@@ -502,3 +502,35 @@ TEST(AdminTest, DisabledAdminDbDrivingSide) {
     EXPECT_TRUE(reader.nodeinfo(gurka::findNode(reader, map.nodes, name))->drive_on_right()) << name;
   }
 }
+
+TEST(AdminTest, DefaultDrivingSide) {
+  const std::string ascii_map = R"(
+    A----B----C
+  )";
+  const gurka::ways ways = {{"AB", {{"highway", "primary"}}},
+                            {"BC", {{"highway", "primary"}, {"driving_side", "right"}}}};
+  const auto layout = gurka::detail::map_to_coordinates(ascii_map, 100);
+  const std::string workdir = "test/data/default_driving_side";
+
+  auto missing_db = gurka::buildtiles(layout, ways, {}, {}, workdir,
+                                      {{"mjolnir.admin", workdir + "/no_such_admin.sqlite"},
+                                       {"mjolnir.data_processing.default_drive_on_right", "false"}});
+  GraphReader missing_db_reader(missing_db.config.get_child("mjolnir"));
+  for (const auto& name : {"A", "B", "C"}) {
+    EXPECT_FALSE(
+        missing_db_reader.nodeinfo(gurka::findNode(missing_db_reader, missing_db.nodes, name))
+            ->drive_on_right())
+        << name;
+  }
+
+  auto disabled_db = gurka::buildtiles(layout, ways, {}, {}, workdir,
+                                       {{"mjolnir.data_processing.use_admin_db", "false"},
+                                        {"mjolnir.data_processing.default_drive_on_right", "false"}});
+  GraphReader disabled_db_reader(disabled_db.config.get_child("mjolnir"));
+  EXPECT_FALSE(
+      disabled_db_reader.nodeinfo(gurka::findNode(disabled_db_reader, disabled_db.nodes, "A"))
+          ->drive_on_right());
+  EXPECT_TRUE(
+      disabled_db_reader.nodeinfo(gurka::findNode(disabled_db_reader, disabled_db.nodes, "C"))
+          ->drive_on_right());
+}
